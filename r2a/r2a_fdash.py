@@ -10,7 +10,7 @@ class R2A_FDash(IR2A):
         IR2A.__init__(self, id)
         self.last_buffer_time = 0
         self.penult_buffer_time = 0
-        self.good_buffer_time = 15         # Represents the buffer in seconds
+        self.good_buffer_time = 22         # Represents the buffer in seconds
         self.throughput_segments = []
         # The list of qualitys
         self.qi_list = []
@@ -22,6 +22,7 @@ class R2A_FDash(IR2A):
         self.segment_idx = 0
 
     def handle_xml_request(self, msg):
+        self.request_time = time.perf_counter()
 
         self.send_down(msg)
 
@@ -153,6 +154,7 @@ class R2A_FDash(IR2A):
             print("(falling, steady, rising)")
             print(delta_buff_rules)
             print(f"Vetor de buffers: {self.throughput_segments}")
+            
             # Removing old throughput values according to a buffer time
             if(len(self.throughput_segments) > self.buffer_back_time):
                 self.throughput_segments.pop(0)
@@ -161,6 +163,30 @@ class R2A_FDash(IR2A):
 
             next_segment_throughput = my_f * average_throughput # (つ◉益◉)つ
 
+            # print(f"A divisao: {average_throughput / next_segment_throughput}")
+            # print(f"OLHA SO: {1 / my_f}")
+
+            last_throughput = self.throughput_segments[-1]
+
+            some_seconds = 60 # (∩｀-´)⊃━✿✿✿✿✿✿
+
+            if(next_segment_throughput > last_throughput): # (〜^∇^)〜  (┛◉Д◉)┛彡(|___|
+                estimated_buffer = self.last_buffer + (1 / my_f - 1) * some_seconds
+
+                # estimated_buffer = round(estimated_buffer) # (ﾉ◕ヮ◕)ﾉ*:･ﾟ
+
+                print(f"OLHA ISSO AQUI: {estimated_buffer}")
+                if(estimated_buffer < self.good_buffer_time):
+                    next_segment_throughput = last_throughput
+            
+            elif(next_segment_throughput < last_throughput):
+                estimated_buffer = self.last_buffer + (average_throughput / last_throughput - 1) * some_seconds
+
+                # estimated_buffer = round(estimated_buffer)
+
+                print(f"OLHA ESSE BUFFER: {estimated_buffer}")
+                if(estimated_buffer > self.good_buffer_time):
+                    next_segment_throughput = last_throughput
 
             # The quality will fluctuate with this implementation
             next_qi_idx = self.__get_quality_index__(next_segment_throughput)
