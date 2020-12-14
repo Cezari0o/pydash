@@ -15,6 +15,7 @@ class R2A_AdaptativeStream(IR2A):
         self.request_time = 0
         self.qi_list = []
         self.segment_idx = 0
+        self.ideal_buffer = 20
 
 
     def __get_delta__(self):
@@ -33,7 +34,7 @@ class R2A_AdaptativeStream(IR2A):
         # Theses two values depends on the type of the network used.
         # Assuming the net used as a wireless network
         # For cabed network, use k = 10 and p_0 = 0.05 
-        k = 7; p_0 = 0.1
+        k = 6; p_0 = 0.2
 
         myDelta = 1 / (1 + exp(-k * (my_p - p_0)))
 
@@ -84,8 +85,11 @@ class R2A_AdaptativeStream(IR2A):
     def handle_segment_size_request(self, msg):
 
         self.request_time = time.perf_counter() # For the real throughput calculus
-        qi_idx = 0; delta = 0.0 
+        qi_idx = 0; delta = 0.0
+        buffer_size = (0,0,None)
 
+        # print(f"\n\n\n\n\nalo {type(buffer_size)}\n\n\n\n")
+        
         if(self.segment_idx == 0):
             self.tpEstimated_list.append(self.qi_list[0])
             qi_idx = self.__get_quality_index__()
@@ -109,7 +113,12 @@ class R2A_AdaptativeStream(IR2A):
 
             estimated_throughput = (1 - delta) * self.tpEstimated_list[pt_idx] + delta * self.tpSegment_list[lt_idx]
 
-            # estimated_throughput = 0.9 * estimated_throughput
+            buffer_size = self.whiteboard.get_playback_buffer_size()[-1][-1]
+
+            # Putting a security margin in case the buffer is to low
+            if(buffer_size < self.ideal_buffer):
+                estimated_throughput = 0.6 * estimated_throughput
+                
             self.tpEstimated_list.append(estimated_throughput)
 
             qi_idx = self.__get_quality_index__()
@@ -118,6 +127,7 @@ class R2A_AdaptativeStream(IR2A):
 
         print("-----------------------------------------------------")
         print(f"Your qi: {qi_idx}, your delta: {delta}, seg_idx: {self.segment_idx - 1}")
+        print(f"Seu buffer: {buffer_size}")
         # print(self.qi_list)
         print(self.tpEstimated_list[-5:-1])
         print("-----------------------------------------------------\n")
@@ -130,7 +140,7 @@ class R2A_AdaptativeStream(IR2A):
 
         # print(f"\n\n\n\n\n\n{msg_size} salve\n\n\n\n\n\n\n\n")
 
-        t = time.perf_counter() - self.request_time
+        t = (time.perf_counter() - self.request_time)
         real_throughput = msg_size / t
 
         self.tpSegment_list.append(real_throughput)
